@@ -1,10 +1,15 @@
 const express = require("express");
+const swaggerUi = require("swagger-ui-express");
+const swaggerDocument = require("./openapi.json");
 
 const app = express();
 const PORT = 3000;
 
 // Middleware
 app.use(express.json());
+
+// Swagger UI
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // In-memory task list
 const tasks = [
