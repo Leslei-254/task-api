@@ -46,7 +46,7 @@ app.get("/tasks", (req, res) => {
   res.json(tasks);
 });
 
-// GET single task by ID
+// GET single task
 app.get("/tasks/:id", (req, res) => {
   const id = parseInt(req.params.id);
 
@@ -61,7 +61,7 @@ app.get("/tasks/:id", (req, res) => {
   res.json(task);
 });
 
-// POST create a new task
+// POST create task
 app.post("/tasks", (req, res) => {
   const { title } = req.body;
 
@@ -79,11 +79,61 @@ app.post("/tasks", (req, res) => {
     done: false,
   };
 
-  // Add task to array
   tasks.push(newTask);
 
-  // Return created task
   res.status(201).json(newTask);
+});
+
+// PUT update task
+app.put("/tasks/:id", (req, res) => {
+  const id = parseInt(req.params.id);
+
+  const task = tasks.find((task) => task.id === id);
+
+  if (!task) {
+    return res.status(404).json({
+      error: `Task ${id} not found`,
+    });
+  }
+
+  const { title, done } = req.body;
+
+  // Validate input
+  if (
+    (title !== undefined && title.trim() === "") ||
+    (title === undefined && done === undefined)
+  ) {
+    return res.status(400).json({
+      error: "Provide a valid title or done value",
+    });
+  }
+
+  if (title !== undefined) {
+    task.title = title.trim();
+  }
+
+  if (done !== undefined) {
+    task.done = done;
+  }
+
+  res.status(200).json(task);
+});
+
+// DELETE task
+app.delete("/tasks/:id", (req, res) => {
+  const id = parseInt(req.params.id);
+
+  const taskIndex = tasks.findIndex((task) => task.id === id);
+
+  if (taskIndex === -1) {
+    return res.status(404).json({
+      error: `Task ${id} not found`,
+    });
+  }
+
+  tasks.splice(taskIndex, 1);
+
+  res.status(204).send();
 });
 
 // Start server
