@@ -5,10 +5,12 @@ const { Pool } = require("pg");
 const { createClient } = require("@supabase/supabase-js");
 const swaggerUi = require("swagger-ui-express");
 const swaggerDocument = require("./openapi.json");
+const authenticate = require("./middleware/auth");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Supabase client
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_KEY
@@ -22,11 +24,8 @@ const pool = new Pool({
 // Middleware
 app.use(express.json());
 
-// Swagger UI
+// Swagger
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-
-// Temporary in-memory task list (will be removed in the next step)
-
 
 // Initialize database
 async function initializeDatabase() {
@@ -55,30 +54,180 @@ async function initializeDatabase() {
   console.log("Database ready.");
 }
 
-// Root endpoint
+// Root
 app.get("/", (req, res) => {
   res.json({
     name: "Task API",
     version: "1.0",
-    endpoints: ["/tasks"],
+    endpoints: [
+      "/health",
+      "/test",
+      "/auth/signup",
+      "/tasks",
+    ],
   });
 });
 
-// Health endpoint
+// Health
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
   });
 });
 
-// GET all tasks
-app.get("/tasks", async (req, res) => {
+// Test Route
+app.get("/test", (req, res) => {
+  res.json({
+    message: "Test route works!",
+  });
+});
+
+// ======================
+// AUTH ROUTES
+// ======================
+
+// Signup
+app.post("/auth/signup", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        error: "Email and password are required",
+      });
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (error) {
+      return res.status(400).json({
+        error: error.message,
+      });
+    }
+
+    return res.status(201).json({
+      message: "User created successfully",
+      user: data.user,
+    });
+
+  } catch (err) {
+    console.error(err);
+
+    return res.status(500).json({
+      error: "Internal server error",
+    });
+  }
+});
+
+// POST /auth/login
+app.post("/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({
+        error: "Email and password are required",
+      });
+    }
+
+    // Authenticate with Supabase
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      return res.status(401).json({
+        error: error.message,
+      });
+    }
+
+    return res.status(200).json({
+      message: "Login successful",
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+      user: data.user,
+    });
+
+  } catch (err) {
+    console.error(err);
+
+    return res.status(500).json({
+      error: "Internal server error",
+    });
+  }
+});
+
+// GET /auth/me
+app.get("/auth/me", authenticate, async (req, res) => {
+  try {
+    return res.status(200).json({
+      user: req.user,
+    });
+  } catch (err) {
+    console.error(err);
+
+    return res.status(500).json({
+      error: "Internal server error",
+    });
+  }
+});
+
+app.get("/public/info", (req, res) => {
+  res.status(200).json({
+    message: "Welcome stranger! This info is public."
+  });
+});
+
+app.get("/protected/profile", authenticate, async (req, res) => {
+  res.status(200).json({
+    id: req.user.id,
+    email: req.user.email,
+    created_at: req.user.created_at
+  });
+});
+
+// POST /auth/logout
+app.post("/auth/logout", async (req, res) => {
+  try {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      return res.status(400).json({
+        error: error.message,
+      });
+    }
+
+    return res.status(200).json({
+      message: "Logged out successfully",
+    });
+
+  } catch (err) {
+    console.error(err);
+
+    return res.status(500).json({
+      error: "Internal server error",
+    });
+  }
+});
+// ======================
+// TASK ROUTES
+// ======================
+
+// Get all tasks
+app.get("/tasks", authenticate, async (req, res) => {
+  console.log(req.user);
   try {
     const result = await pool.query(
       "SELECT * FROM tasks ORDER BY id ASC"
     );
 
     res.status(200).json(result.rows);
+
   } catch (err) {
     console.error(err);
 
@@ -87,7 +236,8 @@ app.get("/tasks", async (req, res) => {
     });
   }
 });
-// GET single task
+
+// Get one task
 app.get("/tasks/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -114,7 +264,7 @@ app.get("/tasks/:id", async (req, res) => {
   }
 });
 
-// POST create task
+// Create task
 app.post("/tasks", async (req, res) => {
   try {
     const { title } = req.body;
@@ -126,13 +276,14 @@ app.post("/tasks", async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO tasks (title, done)
-       VALUES ($1, false)
+      `INSERT INTO tasks(title, done)
+       VALUES($1, false)
        RETURNING *`,
       [title.trim()]
     );
 
     res.status(201).json(result.rows[0]);
+
   } catch (err) {
     console.error(err);
 
@@ -142,14 +293,14 @@ app.post("/tasks", async (req, res) => {
   }
 });
 
-// PUT update task
+// Update task
 app.put("/tasks/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { title, done } = req.body;
 
     const existing = await pool.query(
-      "SELECT * FROM tasks WHERE id = $1",
+      "SELECT * FROM tasks WHERE id=$1",
       [id]
     );
 
@@ -161,22 +312,21 @@ app.put("/tasks/:id", async (req, res) => {
 
     const current = existing.rows[0];
 
-    const updatedTitle =
-      title !== undefined ? title.trim() : current.title;
-
-    const updatedDone =
-      done !== undefined ? done : current.done;
-
     const result = await pool.query(
       `UPDATE tasks
-       SET title = $1,
-           done = $2
-       WHERE id = $3
+       SET title=$1,
+           done=$2
+       WHERE id=$3
        RETURNING *`,
-      [updatedTitle, updatedDone, id]
+      [
+        title ?? current.title,
+        done ?? current.done,
+        id,
+      ]
     );
 
     res.status(200).json(result.rows[0]);
+
   } catch (err) {
     console.error(err);
 
@@ -185,13 +335,14 @@ app.put("/tasks/:id", async (req, res) => {
     });
   }
 });
-// DELETE task
+
+// Delete task
 app.delete("/tasks/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
 
     const result = await pool.query(
-      "DELETE FROM tasks WHERE id = $1 RETURNING *",
+      "DELETE FROM tasks WHERE id=$1 RETURNING *",
       [id]
     );
 
@@ -202,6 +353,7 @@ app.delete("/tasks/:id", async (req, res) => {
     }
 
     res.sendStatus(204);
+
   } catch (err) {
     console.error(err);
 
@@ -211,7 +363,13 @@ app.delete("/tasks/:id", async (req, res) => {
   }
 });
 
-// Start server after database initialization
+app.get("/public/info", (req, res) => {
+  res.status(200).json({
+    message: "Welcome stranger! This info is public."
+  });
+});
+
+// Start server
 initializeDatabase()
   .then(() => {
     app.listen(PORT, () => {
