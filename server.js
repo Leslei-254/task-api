@@ -1,5 +1,7 @@
 require("dotenv").config();
 
+const triage = require("./ai/triage");
+
 const express = require("express");
 const { Pool } = require("pg");
 const { createClient } = require("@supabase/supabase-js");
@@ -211,6 +213,34 @@ app.post("/auth/logout", async (req, res) => {
 
     return res.status(500).json({
       error: "Internal server error",
+    });
+  }
+});
+
+// ======================
+// AI ROUTES
+// ======================
+
+// POST /ai/triage
+app.post("/ai/triage", async (req, res) => {
+  try {
+    const { message } = req.body;
+
+    if (!message || typeof message !== "string" || message.trim() === "") {
+      return res.status(400).json({
+        error: "Message is required",
+      });
+    }
+
+    const result = await triage(message.trim());
+
+    return res.status(200).json(result);
+
+  } catch (err) {
+    console.error("AI triage error:", err);
+
+    return res.status(502).json({
+      error: "AI service failed",
     });
   }
 });

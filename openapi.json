@@ -1,244 +1,202 @@
-# Task API
-
-A RESTful Task Management API built with **Node.js**, **Express**, **PostgreSQL**, **Docker**, and **Supabase Authentication**.
-
-This project demonstrates CRUD operations, JWT authentication, protected routes, API documentation with Swagger, and containerized deployment.
-
----
-
-## Features
-
-- User registration with Supabase Authentication
-- User login
-- User logout
-- JWT authentication
-- Protected API routes
-- CRUD operations for tasks
-- PostgreSQL database
-- Docker support
-- Swagger/OpenAPI documentation
-
----
-
-## Tech Stack
-
-- Node.js
-- Express.js
-- PostgreSQL
-- Supabase
-- Docker
-- Swagger UI
-
----
-
-## Project Structure
-
-```
-task-api/
-│
-├── middleware/
-│   └── auth.js
-│
-├── openapi.json
-├── server.js
-├── package.json
-├── Dockerfile
-├── docker-compose.yml
-├── .env
-└── README.md
-```
-
----
-
-## Installation
-
-Clone the repository
-
-```bash
-git clone https://github.com/YOUR_USERNAME/task-api.git
-```
-
-Move into the project
-
-```bash
-cd task-api
-```
-
-Install dependencies
-
-```bash
-npm install
-```
-
----
-
-## Environment Variables
-
-Create a `.env` file.
-
-```env
-DATABASE_URL=postgres://postgres:dev@localhost:5432/tasks
-PORT=3000
-
-SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-SUPABASE_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
-```
-
----
-
-## Running Locally
-
-Start PostgreSQL using Docker
-
-```bash
-docker compose up -d
-```
-
-Run the API
-
-```bash
-npm start
-```
-
-Development mode
-
-```bash
-npm run dev
-```
-
----
-
-## Swagger Documentation
-
-Open
-
-```
-http://localhost:3000/docs
-```
-
-Swagger UI provides interactive documentation for all endpoints.
-
----
-
-## API Endpoints
-
-### Authentication
-
-| Method | Endpoint |
-|----------|---------------------------|
-| POST | /auth/signup |
-| POST | /auth/login |
-| POST | /auth/logout |
-| GET | /auth/me |
-
----
-
-### Public
-
-| Method | Endpoint |
-|----------|-------------------------|
-| GET | /public/info |
-
----
-
-### Protected
-
-| Method | Endpoint |
-|----------------|-----------------------|
-| GET | /protected/profile |
-
----
-
-### Tasks
-
-| Method | Endpoint |
-|----------|----------------|
-| GET | /tasks |
-| GET | /tasks/{id} |
-| POST | /tasks |
-| PUT | /tasks/{id} |
-| DELETE | /tasks/{id} |
-
----
-
-## Authentication
-
-Protected routes require a Bearer Token.
-
-Example
-
-```
-Authorization: Bearer YOUR_ACCESS_TOKEN
-```
-
----
-
-## Docker
-
-Start containers
-
-```bash
-docker compose up -d
-```
-
-Stop containers
-
-```bash
-docker compose down
-```
-
----
-
-## Testing
-
-Health endpoint
-
-```
-GET /health
-```
-
-Swagger
-
-```
-GET /docs
-```
-
-Public endpoint
-
-```
-GET /public/info
-```
-
-Protected endpoint
-
-```
-GET /protected/profile
-```
-
----
-
-## Screenshots
-
-Include screenshots of:
-
-- Swagger UI
-- Docker containers running
-- Supabase Authentication
-- Protected route
-- Login endpoint
-- Logout endpoint
-
----
-
-## Author
-
-Leslei Omweri Makori
-
-GitHub:
-https://github.com/Leslei-254
-
----
-
-## License
-
-MIT License
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Task API",
+    "version": "1.0.0",
+    "description": "REST API for task management, authentication, and AI-powered support ticket triage."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "API information",
+        "responses": {
+          "200": {
+            "description": "API information"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "API health status"
+          }
+        }
+      }
+    },
+    "/ai/triage": {
+      "post": {
+        "summary": "Classify a support ticket",
+        "description": "Uses the configured LLM to classify a support message. The output is parsed and validated against the triage schema, with one repair attempt for invalid LLM output.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TriageRequest"
+              },
+              "example": {
+                "message": "I was charged twice for my subscription this month."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Structured triage result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriageResponse"
+                },
+                "example": {
+                  "category": "billing",
+                  "urgency": "high",
+                  "confidence": 0.95,
+                  "reason": "User reports being charged twice."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "LLM or server error"
+          }
+        }
+      }
+    },
+    "/tasks": {
+      "get": {
+        "summary": "Get all tasks",
+        "responses": {
+          "200": {
+            "description": "List of tasks"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a task",
+        "responses": {
+          "201": {
+            "description": "Task created"
+          }
+        }
+      }
+    },
+    "/tasks/{id}": {
+      "get": {
+        "summary": "Get a task",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TaskId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task found"
+          },
+          "404": {
+            "description": "Task not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a task",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TaskId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task updated"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a task",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TaskId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task deleted"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "TaskId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    },
+    "schemas": {
+      "TriageRequest": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "TriageResponse": {
+        "type": "object",
+        "required": [
+          "category",
+          "urgency",
+          "confidence",
+          "reason"
+        ],
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "billing",
+              "bug",
+              "feature",
+              "other"
+            ]
+          },
+          "urgency": {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "high"
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
